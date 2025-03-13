@@ -14,6 +14,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLogin = true;
+  bool _rememberMe = false;
 
   @override
   void dispose() {
@@ -36,6 +37,51 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (context) => const DiaryScreen()),
       );
     }
+  }
+
+  void _showForgotPasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Recuperar Senha'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Digite seu e-mail para receber um link de recuperação de senha:',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: TextEditingController(text: _emailController.text),
+              decoration: const InputDecoration(
+                labelText: 'E-mail',
+                prefixIcon: Icon(Icons.email),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCELAR'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // Aqui seria implementada a lógica de recuperação de senha
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Link de recuperação enviado para o e-mail!'),
+                  backgroundColor: AppTheme.primaryColor,
+                ),
+              );
+              Navigator.pop(context);
+            },
+            child: const Text('ENVIAR'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -117,6 +163,37 @@ class _LoginScreenState extends State<LoginScreen> {
                           return null;
                         },
                       ),
+                      if (_isLogin) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Checkbox(
+                                  value: _rememberMe,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _rememberMe = value ?? false;
+                                    });
+                                  },
+                                  activeColor: AppTheme.primaryColor,
+                                ),
+                                const Text('Lembrar-me'),
+                              ],
+                            ),
+                            TextButton(
+                              onPressed: _showForgotPasswordDialog,
+                              child: Text(
+                                'Esqueceu a senha?',
+                                style: TextStyle(
+                                  color: AppTheme.primaryColor,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
