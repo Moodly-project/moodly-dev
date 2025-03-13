@@ -16,6 +16,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
   final _noteController = TextEditingController();
   String _selectedMood = 'Feliz';
   int _moodScore = 4;
+  String? _moodFilter;
   
   final List<String> _moodOptions = [
     'Muito Feliz',
@@ -146,6 +147,52 @@ class _DiaryScreenState extends State<DiaryScreen> {
     );
   }
 
+  void _showFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Filtrar por humor'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ..._moodOptions.map((mood) => 
+              RadioListTile<String>(
+                title: Text(mood),
+                value: mood,
+                groupValue: _moodFilter,
+                onChanged: (value) {
+                  setState(() {
+                    _moodFilter = value;
+                  });
+                  Navigator.pop(context);
+                },
+                secondary: _buildMoodIcon(mood),
+              ),
+            ),
+            RadioListTile<String?>(
+              title: const Text('Todos'),
+              value: null,
+              groupValue: _moodFilter,
+              onChanged: (value) {
+                setState(() {
+                  _moodFilter = value;
+                });
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<MoodEntry> get _filteredEntries {
+    if (_moodFilter == null) {
+      return _entries;
+    }
+    return _entries.where((entry) => entry.mood == _moodFilter).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -153,6 +200,11 @@ class _DiaryScreenState extends State<DiaryScreen> {
       appBar: AppBar(
         title: const Text('Meu Diário de Emoções'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            onPressed: _showFilterDialog,
+            tooltip: 'Filtrar por humor',
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
@@ -186,45 +238,64 @@ class _DiaryScreenState extends State<DiaryScreen> {
                 ],
               ),
             )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _entries.length,
-              itemBuilder: (ctx, index) {
-                final entry = _entries[_entries.length - 1 - index]; // Mostrar mais recentes primeiro
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              DateFormat('dd/MM/yyyy - HH:mm').format(entry.date),
-                              style: TextStyle(
-                                color: AppTheme.textSecondary,
-                                fontSize: 14,
-                              ),
-                            ),
-                            _buildMoodIcon(entry.mood),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          entry.note,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ],
+          : Column(
+              children: [
+                if (_moodFilter != null)
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Chip(
+                      label: Text('Filtrando por: $_moodFilter'),
+                      deleteIcon: const Icon(Icons.close, size: 18),
+                      onDeleted: () {
+                        setState(() {
+                          _moodFilter = null;
+                        });
+                      },
                     ),
                   ),
-                );
-              },
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredEntries.length,
+                    itemBuilder: (ctx, index) {
+                      final entry = _filteredEntries[_filteredEntries.length - 1 - index]; // Mostrar mais recentes primeiro
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    DateFormat('dd/MM/yyyy - HH:mm').format(entry.date),
+                                    style: TextStyle(
+                                      color: AppTheme.textSecondary,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  _buildMoodIcon(entry.mood),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                entry.note,
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddEntryDialog,
