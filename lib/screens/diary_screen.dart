@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/mood_entry.dart';
 import '../utils/app_theme.dart';
+import '../utils/storage_service.dart';
 
 class DiaryScreen extends StatefulWidget {
   const DiaryScreen({Key? key}) : super(key: key);
@@ -17,6 +18,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
   String _selectedMood = 'Feliz';
   int _moodScore = 4;
   String? _moodFilter;
+  bool _isLoading = true;
   
   final List<String> _moodOptions = [
     'Muito Feliz',
@@ -35,13 +37,33 @@ class _DiaryScreenState extends State<DiaryScreen> {
   };
   
   @override
+  void initState() {
+    super.initState();
+    _loadEntries();
+  }
+  
+  Future<void> _loadEntries() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    final loadedEntries = await StorageService.loadMoodEntries();
+    
+    setState(() {
+      _entries.clear();
+      _entries.addAll(loadedEntries);
+      _isLoading = false;
+    });
+  }
+  
+  @override
   void dispose() {
     _titleController.dispose();
     _noteController.dispose();
     super.dispose();
   }
   
-  void _addEntry() {
+  Future<void> _addEntry() async {
     if (_noteController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor, escreva algo no seu diário')),
@@ -60,6 +82,9 @@ class _DiaryScreenState extends State<DiaryScreen> {
       _entries.add(newEntry);
       _noteController.clear();
     });
+    
+    // Salvar entradas no armazenamento local
+    await StorageService.saveMoodEntries(_entries);
     
     Navigator.pop(context);
     
@@ -156,7 +181,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ..._moodOptions.map((mood) => 
-              RadioListTile<String>(
+              RadioListTile<String?>(
                 title: Text(mood),
                 value: mood,
                 groupValue: _moodFilter,
@@ -213,90 +238,94 @@ class _DiaryScreenState extends State<DiaryScreen> {
           ),
         ],
       ),
-      body: _entries.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.book,
-                    size: 80,
-                    color: AppTheme.secondaryColor.withOpacity(0.5),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Seu diário está vazio',
-                    style: AppTheme.subheadingStyle,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Adicione sua primeira entrada!',
-                    style: TextStyle(
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(),
             )
-          : Column(
-              children: [
-                if (_moodFilter != null)
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Chip(
-                      label: Text('Filtrando por: $_moodFilter'),
-                      deleteIcon: const Icon(Icons.close, size: 18),
-                      onDeleted: () {
-                        setState(() {
-                          _moodFilter = null;
-                        });
-                      },
-                    ),
-                  ),
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _filteredEntries.length,
-                    itemBuilder: (ctx, index) {
-                      final entry = _filteredEntries[_filteredEntries.length - 1 - index]; // Mostrar mais recentes primeiro
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+          : _entries.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.book,
+                        size: 80,
+                        color: AppTheme.secondaryColor.withOpacity(0.5),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Seu diário está vazio',
+                        style: AppTheme.subheadingStyle,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Adicione sua primeira entrada!',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      ),
+                    ],
+                  ),
+                )
+              : Column(
+                  children: [
+                    if (_moodFilter != null)
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Chip(
+                          label: Text('Filtrando por: $_moodFilter'),
+                          deleteIcon: const Icon(Icons.close, size: 18),
+                          onDeleted: () {
+                            setState(() {
+                              _moodFilter = null;
+                            });
+                          },
+                        ),
+                      ),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _filteredEntries.length,
+                        itemBuilder: (ctx, index) {
+                          final entry = _filteredEntries[_filteredEntries.length - 1 - index]; // Mostrar mais recentes primeiro
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    DateFormat('dd/MM/yyyy - HH:mm').format(entry.date),
-                                    style: TextStyle(
-                                      color: AppTheme.textSecondary,
-                                      fontSize: 14,
-                                    ),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        DateFormat('dd/MM/yyyy - HH:mm').format(entry.date),
+                                        style: TextStyle(
+                                          color: AppTheme.textSecondary,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      _buildMoodIcon(entry.mood),
+                                    ],
                                   ),
-                                  _buildMoodIcon(entry.mood),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    entry.note,
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                entry.note,
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddEntryDialog,
         backgroundColor: AppTheme.primaryColor,
