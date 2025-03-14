@@ -3,7 +3,7 @@ import '../utils/app_theme.dart';
 import 'diary_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -122,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 40),
                 Text(
-                  _isLogin ? 'Entrar' : 'Criar Conta',
+                  _isLogin ? 'Login' : 'Criar Conta',
                   textAlign: TextAlign.center,
                   style: AppTheme.subheadingStyle,
                 ),
@@ -178,7 +178,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   },
                                   activeColor: AppTheme.primaryColor,
                                 ),
-                                const Text('Lembrar-me'),
+                                const Text('Lembre-me'),
                               ],
                             ),
                             TextButton(
@@ -203,12 +203,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      TextButton(
+                        TextButton(
                         onPressed: _toggleAuthMode,
                         child: Text(
                           _isLogin
-                              ? 'Não tem uma conta? Registre-se'
-                              : 'Já tem uma conta? Entre',
+                              ?  'Registre-se'
+                              :  'Entrar na conta',
                           style: TextStyle(color: AppTheme.primaryColor),
                         ),
                       ),
