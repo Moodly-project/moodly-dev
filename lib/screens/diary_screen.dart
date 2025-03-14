@@ -5,7 +5,7 @@ import '../utils/app_theme.dart';
 import '../utils/storage_service.dart';
 
 class DiaryScreen extends StatefulWidget {
-  const DiaryScreen({Key? key}) : super(key: key);
+  const DiaryScreen({super.key});
 
   @override
   State<DiaryScreen> createState() => _DiaryScreenState();
