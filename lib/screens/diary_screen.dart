@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/mood_entry.dart';
 import '../utils/app_theme.dart';
 import '../utils/storage_service.dart';
+import '../widgets/mood_chart.dart';
 
 class DiaryScreen extends StatefulWidget {
   const DiaryScreen({Key? key}) : super(key: key);
@@ -11,7 +12,7 @@ class DiaryScreen extends StatefulWidget {
   State<DiaryScreen> createState() => _DiaryScreenState();
 }
 
-class _DiaryScreenState extends State<DiaryScreen> {
+class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStateMixin {
   final List<MoodEntry> _entries = [];
   final _titleController = TextEditingController();
   final _noteController = TextEditingController();
@@ -19,6 +20,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
   int _moodScore = 4;
   String? _moodFilter;
   bool _isLoading = true;
+  late TabController _tabController;
   
   final List<String> _moodOptions = [
     'Muito Feliz',
@@ -39,7 +41,16 @@ class _DiaryScreenState extends State<DiaryScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadEntries();
+  }
+  
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _titleController.dispose();
+    _noteController.dispose();
+    super.dispose();
   }
   
   Future<void> _loadEntries() async {
@@ -54,13 +65,6 @@ class _DiaryScreenState extends State<DiaryScreen> {
       _entries.addAll(loadedEntries);
       _isLoading = false;
     });
-  }
-  
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _noteController.dispose();
-    super.dispose();
   }
   
   Future<void> _addEntry() async {
@@ -237,101 +241,201 @@ class _DiaryScreenState extends State<DiaryScreen> {
             },
           ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(icon: Icon(Icons.list), text: 'Registros'),
+            Tab(icon: Icon(Icons.insights), text: 'Gráficos'),
+          ],
+        ),
       ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(),
             )
-          : _entries.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.book,
-                        size: 80,
-                        color: AppTheme.secondaryColor.withOpacity(0.5),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Seu diário está vazio',
-                        style: AppTheme.subheadingStyle,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Adicione sua primeira entrada!',
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : Column(
-                  children: [
-                    if (_moodFilter != null)
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Chip(
-                          label: Text('Filtrando por: $_moodFilter'),
-                          deleteIcon: const Icon(Icons.close, size: 18),
-                          onDeleted: () {
-                            setState(() {
-                              _moodFilter = null;
-                            });
-                          },
-                        ),
-                      ),
-                    Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _filteredEntries.length,
-                        itemBuilder: (ctx, index) {
-                          final entry = _filteredEntries[_filteredEntries.length - 1 - index]; // Mostrar mais recentes primeiro
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                // Tab 1: Lista de registros
+                _entries.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.book,
+                              size: 80,
+                              color: AppTheme.secondaryColor.withOpacity(0.5),
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        DateFormat('dd/MM/yyyy - HH:mm').format(entry.date),
-                                        style: TextStyle(
-                                          color: AppTheme.textSecondary,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      _buildMoodIcon(entry.mood),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    entry.note,
-                                    style: const TextStyle(fontSize: 16),
-                                  ),
-                                ],
+                            const SizedBox(height: 16),
+                            Text(
+                              'Seu diário está vazio',
+                              style: AppTheme.subheadingStyle,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Adicione sua primeira entrada!',
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
                               ),
                             ),
-                          );
-                        },
+                          ],
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          if (_moodFilter != null)
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Chip(
+                                label: Text('Filtrando por: $_moodFilter'),
+                                deleteIcon: const Icon(Icons.close, size: 18),
+                                onDeleted: () {
+                                  setState(() {
+                                    _moodFilter = null;
+                                  });
+                                },
+                              ),
+                            ),
+                          Expanded(
+                            child: ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: _filteredEntries.length,
+                              itemBuilder: (ctx, index) {
+                                final entry = _filteredEntries[_filteredEntries.length - 1 - index]; // Mostrar mais recentes primeiro
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  elevation: 2,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              DateFormat('dd/MM/yyyy - HH:mm').format(entry.date),
+                                              style: TextStyle(
+                                                color: AppTheme.textSecondary,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            _buildMoodIcon(entry.mood),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          entry.note,
+                                          style: const TextStyle(fontSize: 16),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                
+                // Tab 2: Gráficos
+                SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 16),
+                      MoodChart(entries: _entries),
+                      const SizedBox(height: 16),
+                      _buildMoodDistribution(),
+                    ],
+                  ),
                 ),
+              ],
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddEntryDialog,
         backgroundColor: AppTheme.primaryColor,
         child: const Icon(Icons.add),
       ),
     );
+  }
+  
+  Widget _buildMoodDistribution() {
+    // Contando a ocorrência de cada humor
+    Map<String, int> moodCounts = {};
+    for (final mood in _moodOptions) {
+      moodCounts[mood] = 0;
+    }
+    
+    for (final entry in _entries) {
+      moodCounts[entry.mood] = (moodCounts[entry.mood] ?? 0) + 1;
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Distribuição de Humores',
+            style: AppTheme.subheadingStyle,
+          ),
+          const SizedBox(height: 16),
+          ..._moodOptions.map((mood) {
+            final count = moodCounts[mood] ?? 0;
+            final total = _entries.isEmpty ? 1 : _entries.length;
+            final percentage = (count / total * 100).toStringAsFixed(1);
+            
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _buildMoodIcon(mood),
+                      const SizedBox(width: 8),
+                      Text(
+                        mood,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const Spacer(),
+                      Text('$count (${count > 0 ? percentage : 0}%)'),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  LinearProgressIndicator(
+                    value: count / (total > 0 ? total : 1),
+                    backgroundColor: Colors.grey.withOpacity(0.2),
+                    valueColor: AlwaysStoppedAnimation<Color>(_getMoodColor(mood)),
+                    minHeight: 8,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+  
+  Color _getMoodColor(String mood) {
+    switch (mood) {
+      case 'Muito Feliz':
+      case 'Feliz':
+        return AppTheme.happyColor;
+      case 'Neutro':
+        return AppTheme.calmColor;
+      case 'Triste':
+      case 'Muito Triste':
+        return AppTheme.sadColor;
+      default:
+        return AppTheme.primaryColor;
+    }
   }
   
   Widget _buildMoodIcon(String mood) {
