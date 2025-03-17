@@ -21,6 +21,9 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
   String? _moodFilter;
   bool _isLoading = true;
   late TabController _tabController;
+  double _moodSliderValue = 4.0;
+  MoodEntry? _entryBeingEdited;
+  int? _editingIndex;
   
   final List<String> _moodOptions = [
     'Muito Feliz',
@@ -38,10 +41,19 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
     'Muito Triste': 1,
   };
   
+  // Mapa invertido para obter o humor a partir da pontuação
+  final Map<int, String> _scoreMoods = {
+    5: 'Muito Feliz',
+    4: 'Feliz',
+    3: 'Neutro',
+    2: 'Triste',
+    1: 'Muito Triste',
+  };
+  
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadEntries();
   }
   
@@ -67,6 +79,15 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
     });
   }
   
+  void _resetFormState() {
+    _selectedMood = 'Feliz';
+    _moodScore = 4;
+    _moodSliderValue = 4.0;
+    _noteController.clear();
+    _entryBeingEdited = null;
+    _editingIndex = null;
+  }
+  
   Future<void> _addEntry() async {
     if (_noteController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -84,7 +105,7 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
     
     setState(() {
       _entries.add(newEntry);
-      _noteController.clear();
+      _resetFormState();
     });
     
     // Salvar entradas no armazenamento local
@@ -100,7 +121,54 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
     );
   }
   
-  void _showAddEntryDialog() {
+  Future<void> _updateEntry() async {
+    if (_noteController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor, escreva algo no seu diário')),
+      );
+      return;
+    }
+    
+    final updatedEntry = MoodEntry(
+      date: _entryBeingEdited!.date,
+      mood: _selectedMood,
+      moodScore: _moodScore,
+      note: _noteController.text,
+    );
+    
+    setState(() {
+      if (_editingIndex != null) {
+        _entries[_editingIndex!] = updatedEntry;
+      }
+      _resetFormState();
+    });
+    
+    // Salvar entradas no armazenamento local
+    await StorageService.saveMoodEntries(_entries);
+    
+    Navigator.pop(context);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Entrada atualizada com sucesso!'),
+        backgroundColor: AppTheme.primaryColor,
+      ),
+    );
+  }
+  
+  void _showEntryDialog({MoodEntry? entry, int? index}) {
+    // Se entry for fornecido, estamos editando, caso contrário, estamos adicionando
+    if (entry != null) {
+      _entryBeingEdited = entry;
+      _editingIndex = index;
+      _selectedMood = entry.mood;
+      _moodScore = entry.moodScore;
+      _moodSliderValue = entry.moodScore.toDouble();
+      _noteController.text = entry.note;
+    } else {
+      _resetFormState();
+    }
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -119,40 +187,59 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Como você está se sentindo hoje?',
+              entry != null ? 'Editar entrada' : 'Como você está se sentindo hoje?',
               style: AppTheme.subheadingStyle,
             ),
             const SizedBox(height: 16),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedMood,
-                  isExpanded: true,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  borderRadius: BorderRadius.circular(10),
-                  onChanged: (String? newValue) {
-                    if (newValue != null) {
-                      setState(() {
-                        _selectedMood = newValue;
-                        _moodScore = _moodScores[newValue] ?? 3;
-                      });
-                    }
-                  },
-                  items: _moodOptions.map<DropdownMenuItem<String>>((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(value),
-                    );
-                  }).toList(),
+            
+            // Slider para selecionar o humor
+            Row(
+              children: [
+                Icon(
+                  Icons.sentiment_very_dissatisfied,
+                  color: AppTheme.sadColor,
+                  size: 28,
                 ),
+                Expanded(
+                  child: Slider(
+                    value: _moodSliderValue,
+                    min: 1,
+                    max: 5,
+                    divisions: 4,
+                    activeColor: _getColorForSliderValue(_moodSliderValue),
+                    inactiveColor: _getColorForSliderValue(_moodSliderValue).withOpacity(0.3),
+                    label: _scoreMoods[_moodSliderValue.round()],
+                    onChanged: (value) {
+                      setState(() {
+                        _moodSliderValue = value;
+                        _moodScore = value.round();
+                        _selectedMood = _scoreMoods[_moodScore] ?? 'Neutro';
+                      });
+                    },
+                  ),
+                ),
+                Icon(
+                  Icons.sentiment_very_satisfied,
+                  color: AppTheme.happyColor,
+                  size: 28,
+                ),
+              ],
+            ),
+            
+            // Texto mostrando o humor selecionado
+            Center(
+              child: Chip(
+                avatar: _buildMoodIcon(_selectedMood),
+                label: Text(
+                  _selectedMood,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                backgroundColor: _getMoodColor(_selectedMood).withOpacity(0.2),
               ),
             ),
+            
             const SizedBox(height: 16),
+            
             TextField(
               controller: _noteController,
               decoration: const InputDecoration(
@@ -165,8 +252,8 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _addEntry,
-                child: const Text('SALVAR'),
+                onPressed: entry != null ? _updateEntry : _addEntry,
+                child: Text(entry != null ? 'ATUALIZAR' : 'SALVAR'),
               ),
             ),
             const SizedBox(height: 16),
@@ -246,6 +333,7 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
           tabs: const [
             Tab(icon: Icon(Icons.list), text: 'Registros'),
             Tab(icon: Icon(Icons.insights), text: 'Gráficos'),
+            Tab(icon: Icon(Icons.psychology), text: 'Assistente'),
           ],
         ),
       ),
@@ -303,36 +391,51 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
                               itemCount: _filteredEntries.length,
                               itemBuilder: (ctx, index) {
                                 final entry = _filteredEntries[_filteredEntries.length - 1 - index]; // Mostrar mais recentes primeiro
+                                final originalIndex = _entries.indexOf(entry);
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 16),
                                   elevation: 2,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              DateFormat('dd/MM/yyyy - HH:mm').format(entry.date),
-                                              style: TextStyle(
-                                                color: AppTheme.textSecondary,
-                                                fontSize: 14,
+                                  child: InkWell(
+                                    onTap: () => _showEntryDialog(entry: entry, index: originalIndex),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                DateFormat('dd/MM/yyyy - HH:mm').format(entry.date),
+                                                style: TextStyle(
+                                                  color: AppTheme.textSecondary,
+                                                  fontSize: 14,
+                                                ),
                                               ),
-                                            ),
-                                            _buildMoodIcon(entry.mood),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          entry.note,
-                                          style: const TextStyle(fontSize: 16),
-                                        ),
-                                      ],
+                                              Row(
+                                                children: [
+                                                  _buildMoodIcon(entry.mood),
+                                                  const SizedBox(width: 8),
+                                                  const Icon(
+                                                    Icons.edit,
+                                                    size: 18,
+                                                    color: Colors.grey,
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            entry.note,
+                                            style: const TextStyle(fontSize: 16),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 );
@@ -353,10 +456,54 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
                     ],
                   ),
                 ),
+                
+                // Tab 3: Assistente (a ser implementado no futuro)
+                Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.psychology,
+                        size: 100,
+                        color: AppTheme.primaryColor.withOpacity(0.7),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Assistente Moodly',
+                        style: AppTheme.headingStyle,
+                      ),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          'Em breve, nosso assistente de IA irá analisar seus padrões emocionais e oferecer insights e recomendações personalizadas.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.notifications),
+                        label: const Text('Notificar quando disponível'),
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Você será notificado quando o assistente estiver disponível!'),
+                              backgroundColor: AppTheme.primaryColor,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showAddEntryDialog,
+        onPressed: () => _showEntryDialog(),
         backgroundColor: AppTheme.primaryColor,
         child: const Icon(Icons.add),
       ),
@@ -436,6 +583,14 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
       default:
         return AppTheme.primaryColor;
     }
+  }
+  
+  Color _getColorForSliderValue(double value) {
+    if (value >= 4.5) return AppTheme.happyColor;
+    if (value >= 3.5) return AppTheme.happyColor;
+    if (value >= 2.5) return AppTheme.calmColor;
+    if (value >= 1.5) return AppTheme.sadColor;
+    return AppTheme.sadColor;
   }
   
   Widget _buildMoodIcon(String mood) {

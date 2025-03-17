@@ -78,44 +78,23 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   opacity: _fadeAnimation,
                   child: ScaleTransition(
                     scale: _scaleAnimation,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Image.asset(
-                          'assets/images/logotipo.png',
-                          width: 200,
-                          height: 200,
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Moodly',
-                          style: TextStyle(
-                            fontSize: 44,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            shadows: [
-                              Shadow(
-                                blurRadius: 10.0,
-                                color: Colors.black.withOpacity(0.3),
-                                offset: const Offset(2, 2),
-                              ),
-                            ],
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Spacer(flex: 2),
+                          Image.asset(
+                            'assets/images/logotipo.png',
+                            width: 280,
+                            height: 280,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Seu diário de emoções',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
+                          const Spacer(flex: 3),
+                          const CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
-                        ),
-                        const SizedBox(height: 60),
-                        const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      ],
+                          const Spacer(flex: 2),
+                        ],
+                      ),
                     ),
                   ),
                 );
