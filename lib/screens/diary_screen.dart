@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/mood_entry.dart';
+import '../models/api_config.dart';
 import '../utils/app_theme.dart';
 import '../utils/storage_service.dart';
+import '../utils/api_service.dart';
 import '../widgets/mood_chart.dart';
 
 class DiaryScreen extends StatefulWidget {
@@ -16,10 +18,17 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
   final List<MoodEntry> _entries = [];
   final _titleController = TextEditingController();
   final _noteController = TextEditingController();
+  final _apiKeyController = TextEditingController();
+  final _apiUrlController = TextEditingController();
   String _selectedMood = 'Feliz';
   int _moodScore = 4;
+  String _selectedProvider = 'openai';
   String? _moodFilter;
   bool _isLoading = true;
+  bool _analyzePatterns = true;
+  bool _provideSuggestions = true;
+  bool _enableReminders = false;
+  bool _isApiConfigured = false;
   late TabController _tabController;
   MoodEntry? _entryBeingEdited;
   int? _editingIndex;
@@ -54,6 +63,7 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadEntries();
+    _loadApiConfig();
   }
   
   @override
@@ -61,6 +71,8 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
     _tabController.dispose();
     _titleController.dispose();
     _noteController.dispose();
+    _apiKeyController.dispose();
+    _apiUrlController.dispose();
     super.dispose();
   }
   
@@ -76,6 +88,87 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
       _entries.addAll(loadedEntries);
       _isLoading = false;
     });
+  }
+  
+  Future<void> _loadApiConfig() async {
+    final apiConfig = await ApiService.loadApiConfig();
+    if (apiConfig != null) {
+      setState(() {
+        _selectedProvider = apiConfig.provider;
+        _apiKeyController.text = apiConfig.apiKey;
+        _apiUrlController.text = apiConfig.apiUrl ?? '';
+        _analyzePatterns = apiConfig.analyzePatterns;
+        _provideSuggestions = apiConfig.provideSuggestions;
+        _enableReminders = apiConfig.enableReminders;
+        _isApiConfigured = true;
+      });
+    }
+  }
+  
+  Future<void> _saveApiConfig() async {
+    if (_apiKeyController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, insira uma chave de API válida'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    final apiConfig = ApiConfig(
+      provider: _selectedProvider,
+      apiKey: _apiKeyController.text,
+      apiUrl: _apiUrlController.text.isNotEmpty ? _apiUrlController.text : null,
+      analyzePatterns: _analyzePatterns,
+      provideSuggestions: _provideSuggestions,
+      enableReminders: _enableReminders,
+    );
+    
+    final success = await ApiService.saveApiConfig(apiConfig);
+    
+    if (success) {
+      setState(() {
+        _isApiConfigured = true;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Configurações salvas com sucesso!'),
+          backgroundColor: AppTheme.primaryColor,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erro ao salvar configurações'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+  
+  Future<void> _clearApiConfig() async {
+    final success = await ApiService.clearApiConfig();
+    
+    if (success) {
+      setState(() {
+        _selectedProvider = 'openai';
+        _apiKeyController.clear();
+        _apiUrlController.clear();
+        _analyzePatterns = true;
+        _provideSuggestions = true;
+        _enableReminders = false;
+        _isApiConfigured = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Configurações removidas com sucesso'),
+          backgroundColor: AppTheme.primaryColor,
+        ),
+      );
+    }
   }
   
   void _resetFormState() {
@@ -508,47 +601,271 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
                   ),
                 ),
                 
-                // Tab 3: Assistente (a ser implementado no futuro)
-                Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.psychology,
-                        size: 100,
-                        color: AppTheme.primaryColor.withOpacity(0.7),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Assistente Moodly',
-                        style: AppTheme.headingStyle,
-                      ),
-                      const SizedBox(height: 16),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 32),
-                        child: Text(
-                          'Em breve, nosso assistente de IA irá analisar seus padrões emocionais e oferecer insights e recomendações personalizadas.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 16,
+                // Tab 3: Assistente (configurações de IA)
+                SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 20),
+                        Center(
+                          child: Icon(
+                            Icons.psychology,
+                            size: 80,
+                            color: AppTheme.primaryColor.withOpacity(0.7),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.notifications),
-                        label: const Text('Notificar quando disponível'),
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Você será notificado quando o assistente estiver disponível!'),
-                              backgroundColor: AppTheme.primaryColor,
+                        const SizedBox(height: 20),
+                        Center(
+                          child: Text(
+                            'Assistente Moodly',
+                            style: AppTheme.headingStyle,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Text(
+                              'Configure seu assistente de IA para receber insights personalizados baseados em seus padrões emocionais.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 16,
+                              ),
                             ),
-                          );
-                        },
-                      ),
-                    ],
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+                        Card(
+                          elevation: 3,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(20.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Configuração da API',
+                                      style: AppTheme.subheadingStyle,
+                                    ),
+                                    if (_isApiConfigured)
+                                      TextButton.icon(
+                                        icon: const Icon(Icons.delete, color: Colors.red),
+                                        label: const Text('Limpar', style: TextStyle(color: Colors.red)),
+                                        onPressed: _clearApiConfig,
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 20),
+                                DropdownButtonFormField<String>(
+                                  value: _selectedProvider,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Provedor de IA',
+                                    prefixIcon: Icon(Icons.api),
+                                    hintText: 'Selecione o provedor',
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: 'openai',
+                                      child: Text('OpenAI (ChatGPT)'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'anthropic',
+                                      child: Text('Anthropic (Claude)'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'google',
+                                      child: Text('Google (Gemini)'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'mistral',
+                                      child: Text('Mistral AI'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'outro',
+                                      child: Text('Outro'),
+                                    ),
+                                  ],
+                                  onChanged: (value) {
+                                    if (value != null) {
+                                      setState(() {
+                                        _selectedProvider = value;
+                                      });
+                                    }
+                                  },
+                                ),
+                                const SizedBox(height: 20),
+                                TextFormField(
+                                  controller: _apiKeyController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Chave da API',
+                                    prefixIcon: Icon(Icons.key),
+                                    hintText: 'Cole sua chave da API aqui',
+                                    helperText: 'A chave será armazenada de forma segura no dispositivo',
+                                  ),
+                                  obscureText: true,
+                                ),
+                                const SizedBox(height: 20),
+                                TextFormField(
+                                  controller: _apiUrlController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'URL da API (opcional)',
+                                    prefixIcon: Icon(Icons.link),
+                                    hintText: 'Para provedores personalizados',
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Center(
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(Icons.save),
+                                    label: const Text('Salvar Configurações'),
+                                    onPressed: _saveApiConfig,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 30),
+                        Card(
+                          elevation: 3,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(20.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Funcionalidades do Assistente',
+                                  style: AppTheme.subheadingStyle,
+                                ),
+                                const SizedBox(height: 15),
+                                SwitchListTile(
+                                  title: const Text('Análise de Padrões Emocionais'),
+                                  subtitle: const Text('Receba insights sobre suas tendências emocionais'),
+                                  value: _analyzePatterns,
+                                  onChanged: (bool value) {
+                                    setState(() {
+                                      _analyzePatterns = value;
+                                    });
+                                  },
+                                ),
+                                const Divider(),
+                                SwitchListTile(
+                                  title: const Text('Sugestões de Bem-estar'),
+                                  subtitle: const Text('Receba dicas personalizadas baseadas em seu humor'),
+                                  value: _provideSuggestions,
+                                  onChanged: (bool value) {
+                                    setState(() {
+                                      _provideSuggestions = value;
+                                    });
+                                  },
+                                ),
+                                const Divider(),
+                                SwitchListTile(
+                                  title: const Text('Lembretes Diários'),
+                                  subtitle: const Text('Receba lembretes para registrar suas emoções'),
+                                  value: _enableReminders,
+                                  onChanged: (bool value) {
+                                    setState(() {
+                                      _enableReminders = value;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (_isApiConfigured && _entries.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 30.0),
+                          child: Card(
+                            elevation: 3,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Insights de IA',
+                                    style: AppTheme.subheadingStyle,
+                                  ),
+                                  const SizedBox(height: 15),
+                                  const Text(
+                                    'Análise simulada: Seus registros mostram uma tendência de melhora no humor nos últimos dias. Momentos de tristeza ocorrem principalmente pela manhã. Considere praticar atividades ao ar livre nos horários em que seu humor costuma estar mais baixo.',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  const Text(
+                                    'Recomendações:',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  ...[
+                                    'Pratique 5 minutos de meditação pela manhã',
+                                    'Tente manter um horário regular para dormir',
+                                    'Considere caminhar ao ar livre após o almoço',
+                                  ].map((tip) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Icon(Icons.check_circle, color: AppTheme.primaryColor, size: 20),
+                                        const SizedBox(width: 8),
+                                        Expanded(child: Text(tip)),
+                                      ],
+                                    ),
+                                  )).toList(),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 30),
+                        Center(
+                          child: TextButton.icon(
+                            icon: const Icon(Icons.help_outline),
+                            label: const Text('Como funciona o assistente?'),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (BuildContext context) {
+                                  return AlertDialog(
+                                    title: const Text('Sobre o Assistente'),
+                                    content: const SingleChildScrollView(
+                                      child: Text(
+                                        'O Assistente Moodly utiliza inteligência artificial para analisar seus registros de humor e oferecer insights personalizados.\n\n'
+                                        'Para utilizar o assistente, você precisa fornecer uma chave de API válida de um dos provedores suportados.\n\n'
+                                        'Suas informações são processadas de forma segura e privada. Nenhum dado pessoal é compartilhado com terceiros.\n\n'
+                                        'As análises podem incluir padrões de humor ao longo do tempo, fatores que influenciam seu bem-estar emocional e sugestões para melhorar sua saúde mental.',
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        child: const Text('Entendi'),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
