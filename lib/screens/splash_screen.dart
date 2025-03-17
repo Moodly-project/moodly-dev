@@ -15,7 +15,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
@@ -33,20 +32,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       ),
     );
     
-    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.0, 0.5, curve: Curves.easeOutBack),
-      ),
-    );
-    
-    _pulseAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween<double>(begin: 1.0, end: 1.2), weight: 1),
-      TweenSequenceItem(tween: Tween<double>(begin: 1.2, end: 1.0), weight: 1),
-    ]).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.5, 1.0, curve: Curves.easeInOut),
+        curve: const Interval(0.0, 0.7, curve: Curves.easeOutBack),
       ),
     );
     
@@ -89,47 +78,23 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   opacity: _fadeAnimation,
                   child: ScaleTransition(
                     scale: _scaleAnimation,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Transform.scale(
-                          scale: _pulseAnimation.value,
-                          child: const Icon(
-                            Icons.favorite,
-                            color: Colors.white,
-                            size: 80,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Spacer(flex: 2),
+                          Image.asset(
+                            'assets/images/logotipo.png',
+                            width: 280,
+                            height: 280,
                           ),
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Moodly',
-                          style: TextStyle(
-                            fontSize: 44,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            shadows: [
-                              Shadow(
-                                blurRadius: 10.0,
-                                color: Colors.black.withOpacity(0.3),
-                                offset: const Offset(2, 2),
-                              ),
-                            ],
+                          const Spacer(flex: 3),
+                          const CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Seu diário de emoções',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 60),
-                        const CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      ],
+                          const Spacer(flex: 2),
+                        ],
+                      ),
                     ),
                   ),
                 );

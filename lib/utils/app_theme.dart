@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Cores principais relacionadas à saúde mental
-  static const Color primaryColor = Color(0xFF6A7FDB); // Azul acalmante
-  static const Color secondaryColor = Color(0xFF9D88D9); // Lavanda relaxante
-  static const Color accentColor = Color(0xFF5BC0BE); // Verde-água tranquilo
-  static const Color backgroundColor = Color(0xFFF5F5F5); // Branco suave
+  // Novas cores para o projeto
+  static const Color primaryColor = Color(0xFF3E8974); // Verde escuro
+  static const Color secondaryColor = Color(0xFF93B5AB); // Verde médio
+  static const Color accentColor = Color(0xFFAAD2B0); // Verde claro
+  static const Color backgroundColor = Color(0xFFD9D9D9); // Cinza claro
   
-  // Cores de estado emocional
-  static const Color calmColor = Color(0xFF90CAFF); // Azul claro
-  static const Color happyColor = Color(0xFFFFD166); // Amarelo
-  static const Color sadColor = Color(0xFF9399A1); // Cinza azulado
-  static const Color anxiousColor = Color(0xFFFF9F80); // Laranja suave
-  static const Color angryColor = Color(0xFFFF6B6B); // Vermelho suave
+  // Cores de estado emocional (realçadas)
+  static const Color calmColor = Color(0xFF7FBAC6); // Azul turquesa (Neutro)
+  static const Color happyColor = Color(0xFF7ED957); // Verde vibrante (Feliz)
+  static const Color sadColor = Color(0xFF9B7EB5); // Roxo suave (Triste)
+  static const Color anxiousColor = Color(0xFFFFB347); // Laranja (Ansioso)
+  static const Color angryColor = Color(0xFFFF6B6B); // Vermelho suave (Irritado)
   
   // Textos
   static const Color textPrimary = Color(0xFF2D3142); // Quase preto
@@ -62,6 +62,11 @@ class AppTheme {
             borderRadius: BorderRadius.circular(10),
           ),
         ),
+      ),
+      tabBarTheme: const TabBarTheme(
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white70,
+        indicatorColor: Colors.white,
       ),
       inputDecorationTheme: InputDecorationTheme(
         border: OutlineInputBorder(
