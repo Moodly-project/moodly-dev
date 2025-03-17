@@ -21,7 +21,6 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
   String? _moodFilter;
   bool _isLoading = true;
   late TabController _tabController;
-  double _moodSliderValue = 4.0;
   MoodEntry? _entryBeingEdited;
   int? _editingIndex;
   
@@ -82,7 +81,6 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
   void _resetFormState() {
     _selectedMood = 'Feliz';
     _moodScore = 4;
-    _moodSliderValue = 4.0;
     _noteController.clear();
     _entryBeingEdited = null;
     _editingIndex = null;
@@ -156,6 +154,52 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
     );
   }
   
+  Future<void> _deleteEntry() async {
+    if (_editingIndex != null) {
+      setState(() {
+        _entries.removeAt(_editingIndex!);
+        _resetFormState();
+      });
+      
+      // Salvar entradas no armazenamento local
+      await StorageService.saveMoodEntries(_entries);
+      
+      Navigator.pop(context);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Entrada excluída com sucesso!'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+  
+  void _showDeleteConfirmationDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Excluir entrada'),
+          content: const Text('Tem certeza que deseja excluir esta entrada? Esta ação não pode ser desfeita.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCELAR'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _deleteEntry();
+              },
+              child: const Text('EXCLUIR', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
   void _showEntryDialog({MoodEntry? entry, int? index}) {
     // Se entry for fornecido, estamos editando, caso contrário, estamos adicionando
     if (entry != null) {
@@ -163,7 +207,6 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
       _editingIndex = index;
       _selectedMood = entry.mood;
       _moodScore = entry.moodScore;
-      _moodSliderValue = entry.moodScore.toDouble();
       _noteController.text = entry.note;
     } else {
       _resetFormState();
@@ -175,90 +218,98 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 20,
-          right: 20,
-          top: 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              entry != null ? 'Editar entrada' : 'Como você está se sentindo hoje?',
-              style: AppTheme.subheadingStyle,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 20,
+              right: 20,
+              top: 20,
             ),
-            const SizedBox(height: 16),
-            
-            // Slider para selecionar o humor
-            Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.sentiment_very_dissatisfied,
-                  color: AppTheme.sadColor,
-                  size: 28,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      entry != null ? 'Editar entrada' : 'Como você está se sentindo hoje?',
+                      style: AppTheme.subheadingStyle,
+                    ),
+                    if (entry != null)
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: _showDeleteConfirmationDialog,
+                        tooltip: 'Excluir entrada',
+                      ),
+                  ],
                 ),
-                Expanded(
-                  child: Slider(
-                    value: _moodSliderValue,
-                    min: 1,
-                    max: 5,
-                    divisions: 4,
-                    activeColor: _getColorForSliderValue(_moodSliderValue),
-                    inactiveColor: _getColorForSliderValue(_moodSliderValue).withOpacity(0.3),
-                    label: _scoreMoods[_moodSliderValue.round()],
-                    onChanged: (value) {
-                      setState(() {
-                        _moodSliderValue = value;
-                        _moodScore = value.round();
-                        _selectedMood = _scoreMoods[_moodScore] ?? 'Neutro';
-                      });
-                    },
+                const SizedBox(height: 16),
+                
+                // Dropdown para selecionar o humor
+                DropdownButtonFormField<String>(
+                  value: _selectedMood,
+                  decoration: const InputDecoration(
+                    labelText: 'Humor',
+                    prefixIcon: Icon(Icons.mood),
                   ),
+                  items: _moodOptions
+                      .map((mood) => DropdownMenuItem(
+                            value: mood,
+                            child: Row(
+                              children: [
+                                _buildMoodIcon(mood),
+                                const SizedBox(width: 12),
+                                Text(mood),
+                              ],
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setModalState(() {
+                        _selectedMood = value;
+                        _moodScore = _moodScores[value] ?? 3;
+                      });
+                    }
+                  },
                 ),
-                Icon(
-                  Icons.sentiment_very_satisfied,
-                  color: AppTheme.happyColor,
-                  size: 28,
+                
+                const SizedBox(height: 16),
+                
+                TextField(
+                  controller: _noteController,
+                  decoration: const InputDecoration(
+                    labelText: 'O que está acontecendo?',
+                    alignLabelWithHint: true,
+                  ),
+                  maxLines: 5,
                 ),
+                const SizedBox(height: 24),
+                
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (entry != null)
+                      TextButton.icon(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        label: const Text('EXCLUIR', style: TextStyle(color: Colors.red)),
+                        onPressed: _showDeleteConfirmationDialog,
+                      ),
+                    const Spacer(),
+                    ElevatedButton(
+                      onPressed: entry != null ? _updateEntry : _addEntry,
+                      child: Text(entry != null ? 'ATUALIZAR' : 'SALVAR'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
               ],
             ),
-            
-            // Texto mostrando o humor selecionado
-            Center(
-              child: Chip(
-                avatar: _buildMoodIcon(_selectedMood),
-                label: Text(
-                  _selectedMood,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                backgroundColor: _getMoodColor(_selectedMood).withOpacity(0.2),
-              ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            TextField(
-              controller: _noteController,
-              decoration: const InputDecoration(
-                labelText: 'O que está acontecendo?',
-                alignLabelWithHint: true,
-              ),
-              maxLines: 5,
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: entry != null ? _updateEntry : _addEntry,
-                child: Text(entry != null ? 'ATUALIZAR' : 'SALVAR'),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -583,14 +634,6 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
       default:
         return AppTheme.primaryColor;
     }
-  }
-  
-  Color _getColorForSliderValue(double value) {
-    if (value >= 4.5) return AppTheme.happyColor;
-    if (value >= 3.5) return AppTheme.happyColor;
-    if (value >= 2.5) return AppTheme.calmColor;
-    if (value >= 1.5) return AppTheme.sadColor;
-    return AppTheme.sadColor;
   }
   
   Widget _buildMoodIcon(String mood) {
