@@ -1,0 +1,130 @@
+### Variáveis
+@baseUrl = http://localhost:3000/api
+@authToken = SEU_TOKEN_JWT_AQUI
+
+### Teste de servidor
+GET http://localhost:3000/
+
+### Autenticação
+
+# Registrar um novo usuário
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Usuário Teste",
+  "email": "usuario@teste.com",
+  "password": "senha123"
+}
+
+### Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "usuario@teste.com",
+  "password": "senha123"
+}
+
+### Obter perfil do usuário
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{authToken}}
+
+### Atualizar perfil do usuário
+PUT {{baseUrl}}/auth/profile
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Usuário Atualizado",
+  "email": "usuario@teste.com"
+}
+
+### Atualizar senha
+PUT {{baseUrl}}/auth/password
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "currentPassword": "senha123",
+  "newPassword": "novaSenha123"
+}
+
+### Registros de Humor
+
+# Criar nova entrada de humor
+POST {{baseUrl}}/mood-entries
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "date": "2023-03-17T12:00:00Z",
+  "mood": "Feliz",
+  "moodScore": 5,
+  "note": "Hoje foi um ótimo dia!",
+  "activities": ["Exercício", "Leitura", "Meditação"]
+}
+
+### Listar entradas de humor
+GET {{baseUrl}}/mood-entries
+Authorization: Bearer {{authToken}}
+
+### Listar entradas com filtros
+GET {{baseUrl}}/mood-entries?limit=10&offset=0&startDate=2023-01-01&endDate=2023-12-31
+Authorization: Bearer {{authToken}}
+
+### Obter uma entrada específica
+GET {{baseUrl}}/mood-entries/1
+Authorization: Bearer {{authToken}}
+
+### Atualizar uma entrada
+PUT {{baseUrl}}/mood-entries/1
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "date": "2023-03-17T12:00:00Z",
+  "mood": "Muito Feliz",
+  "moodScore": 5,
+  "note": "Hoje foi um dia incrível!",
+  "activities": ["Exercício", "Leitura", "Meditação", "Hobby"]
+}
+
+### Excluir uma entrada
+DELETE {{baseUrl}}/mood-entries/1
+Authorization: Bearer {{authToken}}
+
+### Obter estatísticas
+GET {{baseUrl}}/mood-entries/stats?period=month
+Authorization: Bearer {{authToken}}
+
+### Atividades
+
+# Listar todas as atividades
+GET {{baseUrl}}/activities
+
+### Listar atividades mais comuns do usuário
+GET {{baseUrl}}/activities/user/common
+Authorization: Bearer {{authToken}}
+
+### Criar nova atividade
+POST {{baseUrl}}/activities
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Viagem"
+}
+
+### Atualizar uma atividade
+PUT {{baseUrl}}/activities/11
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "name": "Viagem Internacional"
+}
+
+### Excluir uma atividade
+DELETE {{baseUrl}}/activities/11
+Authorization: Bearer {{authToken}} 

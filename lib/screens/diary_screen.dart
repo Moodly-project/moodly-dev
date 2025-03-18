@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/mood_entry.dart';
 import '../utils/app_theme.dart';
-import '../utils/storage_service.dart';
+import '../services/mood_entry_service.dart';
+import '../services/activity_service.dart';
+import '../services/auth_service.dart';
 import '../widgets/mood_chart.dart';
+import 'login_screen.dart';
 
 class DiaryScreen extends StatefulWidget {
   const DiaryScreen({super.key});
@@ -23,6 +26,8 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
   late TabController _tabController;
   MoodEntry? _entryBeingEdited;
   int? _editingIndex;
+  List<String> _availableActivities = [];
+  List<String> _selectedActivities = [];
   
   final List<String> _moodOptions = [
     'Muito Feliz',
@@ -54,6 +59,7 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadEntries();
+    _loadActivities();
   }
   
   @override
@@ -64,24 +70,55 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
     super.dispose();
   }
   
+  Future<void> _loadActivities() async {
+    try {
+      final result = await ActivityService.getAllActivities();
+      
+      if (result['success']) {
+        setState(() {
+          _availableActivities = (result['activities'] as List)
+              .map((activity) => activity['name'] as String)
+              .toList();
+        });
+      }
+    } catch (e) {
+      print('Erro ao carregar atividades: $e');
+    }
+  }
+  
   Future<void> _loadEntries() async {
     setState(() {
       _isLoading = true;
     });
     
-    final loadedEntries = await StorageService.loadMoodEntries();
-    
-    setState(() {
-      _entries.clear();
-      _entries.addAll(loadedEntries);
-      _isLoading = false;
-    });
+    try {
+      final result = await MoodEntryService.getMoodEntries();
+      
+      if (result['success']) {
+        setState(() {
+          _entries.clear();
+          _entries.addAll(result['entries'] as List<MoodEntry>);
+          _isLoading = false;
+        });
+      } else {
+        print('Erro ao carregar entradas: ${result['message']}');
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Erro ao carregar entradas: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
   
   void _resetFormState() {
     _selectedMood = 'Feliz';
     _moodScore = 4;
     _noteController.clear();
+    _selectedActivities = [];
     _entryBeingEdited = null;
     _editingIndex = null;
   }
@@ -99,24 +136,53 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
       mood: _selectedMood,
       moodScore: _moodScore,
       note: _noteController.text,
+      activities: _selectedActivities,
     );
     
     setState(() {
-      _entries.add(newEntry);
-      _resetFormState();
+      _isLoading = true;
     });
     
-    // Salvar entradas no armazenamento local
-    await StorageService.saveMoodEntries(_entries);
-    
-    Navigator.pop(context);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Entrada adicionada com sucesso!'),
-        backgroundColor: AppTheme.primaryColor,
-      ),
-    );
+    try {
+      final result = await MoodEntryService.createMoodEntry(newEntry);
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (result['success']) {
+        // Atualizar a lista de entradas
+        await _loadEntries();
+        
+        _resetFormState();
+        Navigator.pop(context);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Entrada adicionada com sucesso!'),
+            backgroundColor: AppTheme.primaryColor,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message']),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao adicionar entrada: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
   
   Future<void> _updateEntry() async {
@@ -127,191 +193,260 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
       return;
     }
     
+    if (_entryBeingEdited == null || _entryBeingEdited!.id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erro: ID da entrada não encontrado'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
     final updatedEntry = MoodEntry(
+      id: _entryBeingEdited!.id,
       date: _entryBeingEdited!.date,
       mood: _selectedMood,
       moodScore: _moodScore,
       note: _noteController.text,
+      activities: _selectedActivities,
     );
     
     setState(() {
-      if (_editingIndex != null) {
-        _entries[_editingIndex!] = updatedEntry;
-      }
-      _resetFormState();
+      _isLoading = true;
     });
     
-    // Salvar entradas no armazenamento local
-    await StorageService.saveMoodEntries(_entries);
-    
-    Navigator.pop(context);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Entrada atualizada com sucesso!'),
-        backgroundColor: AppTheme.primaryColor,
-      ),
-    );
-  }
-  
-  Future<void> _deleteEntry() async {
-    if (_editingIndex != null) {
+    try {
+      final result = await MoodEntryService.updateMoodEntry(
+        _entryBeingEdited!.id!,
+        updatedEntry,
+      );
+      
       setState(() {
-        _entries.removeAt(_editingIndex!);
-        _resetFormState();
+        _isLoading = false;
       });
       
-      // Salvar entradas no armazenamento local
-      await StorageService.saveMoodEntries(_entries);
-      
-      Navigator.pop(context);
+      if (result['success']) {
+        // Atualizar a lista de entradas
+        await _loadEntries();
+        
+        _resetFormState();
+        Navigator.pop(context);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Entrada atualizada com sucesso!'),
+            backgroundColor: AppTheme.primaryColor,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message']),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
       
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Entrada excluída com sucesso!'),
-          backgroundColor: Colors.redAccent,
+        SnackBar(
+          content: Text('Erro ao atualizar entrada: $e'),
+          backgroundColor: Colors.red,
         ),
       );
     }
   }
   
-  void _showDeleteConfirmationDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Excluir entrada'),
-          content: const Text('Tem certeza que deseja excluir esta entrada? Esta ação não pode ser desfeita.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('CANCELAR'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _deleteEntry();
-              },
-              child: const Text('EXCLUIR', style: TextStyle(color: Colors.red)),
-            ),
-          ],
+  Future<void> _deleteEntry(int index) async {
+    final entry = _entries[index];
+    
+    if (entry.id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erro: ID da entrada não encontrado'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final result = await MoodEntryService.deleteMoodEntry(entry.id!);
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (result['success']) {
+        // Remover da lista local
+        setState(() {
+          _entries.removeAt(index);
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Entrada excluída com sucesso!'),
+            backgroundColor: AppTheme.primaryColor,
+          ),
         );
-      },
-    );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message']),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao excluir entrada: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
   
   void _showEntryDialog({MoodEntry? entry, int? index}) {
-    // Se entry for fornecido, estamos editando, caso contrário, estamos adicionando
+    _entryBeingEdited = entry;
+    _editingIndex = index;
+    
     if (entry != null) {
-      _entryBeingEdited = entry;
-      _editingIndex = index;
       _selectedMood = entry.mood;
       _moodScore = entry.moodScore;
       _noteController.text = entry.note;
+      _selectedActivities = List.from(entry.activities);
     } else {
       _resetFormState();
     }
     
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-              left: 20,
-              right: 20,
-              top: 20,
-            ),
+        builder: (context, setState) => AlertDialog(
+          title: Text(entry == null ? 'Nova Entrada' : 'Editar Entrada'),
+          content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      entry != null ? 'Editar entrada' : 'Como você está se sentindo hoje?',
-                      style: AppTheme.subheadingStyle,
-                    ),
-                    if (entry != null)
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: _showDeleteConfirmationDialog,
-                        tooltip: 'Excluir entrada',
-                      ),
-                  ],
+                const Text(
+                  'Como você está se sentindo hoje?',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: _moodOptions.map((mood) {
+                    return ChoiceChip(
+                      label: Text(mood),
+                      selected: _selectedMood == mood,
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _selectedMood = mood;
+                            _moodScore = _moodScores[mood]!;
+                          });
+                        }
+                      },
+                    );
+                  }).toList(),
                 ),
                 const SizedBox(height: 16),
-                
-                // Dropdown para selecionar o humor
-                DropdownButtonFormField<String>(
-                  value: _selectedMood,
-                  decoration: const InputDecoration(
-                    labelText: 'Humor',
-                    prefixIcon: Icon(Icons.mood),
-                  ),
-                  items: _moodOptions
-                      .map((mood) => DropdownMenuItem(
-                            value: mood,
-                            child: Row(
-                              children: [
-                                _buildMoodIcon(mood),
-                                const SizedBox(width: 12),
-                                Text(mood),
-                              ],
-                            ),
-                          ))
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setModalState(() {
-                        _selectedMood = value;
-                        _moodScore = _moodScores[value] ?? 3;
-                      });
-                    }
-                  },
+                const Text(
+                  'Atividades realizadas hoje:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: _availableActivities.map((activity) {
+                    return FilterChip(
+                      label: Text(activity),
+                      selected: _selectedActivities.contains(activity),
+                      onSelected: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedActivities.add(activity);
+                          } else {
+                            _selectedActivities.remove(activity);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
                 const SizedBox(height: 16),
-                
+                const Text(
+                  'Anote seus pensamentos:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
                 TextField(
                   controller: _noteController,
-                  decoration: const InputDecoration(
-                    labelText: 'O que está acontecendo?',
-                    alignLabelWithHint: true,
-                  ),
                   maxLines: 5,
+                  decoration: const InputDecoration(
+                    hintText: 'Escreva aqui seus pensamentos...',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-                const SizedBox(height: 24),
-                
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    if (entry != null)
-                      TextButton.icon(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        label: const Text('EXCLUIR', style: TextStyle(color: Colors.red)),
-                        onPressed: _showDeleteConfirmationDialog,
-                      ),
-                    const Spacer(),
-                    ElevatedButton(
-                      onPressed: entry != null ? _updateEntry : _addEntry,
-                      child: Text(entry != null ? 'ATUALIZAR' : 'SALVAR'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
               ],
             ),
-          );
-        },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (entry == null) {
+                  _addEntry();
+                } else {
+                  _updateEntry();
+                }
+              },
+              child: Text(entry == null ? 'Adicionar' : 'Atualizar'),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _logout() async {
+    try {
+      await AuthService.logout();
+      
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao fazer logout: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showFilterDialog() {
@@ -374,9 +509,7 @@ class _DiaryScreenState extends State<DiaryScreen> with SingleTickerProviderStat
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              Navigator.of(context).pushReplacementNamed('/login');
-            },
+            onPressed: _logout,
           ),
         ],
         bottom: TabBar(

@@ -1,4 +1,5 @@
 class MoodEntry {
+  final int? id; // ID do banco de dados
   final DateTime date;
   final String mood;
   final int moodScore; // 1-5, sendo 1 muito negativo e 5 muito positivo
@@ -6,6 +7,7 @@ class MoodEntry {
   final List<String> activities;
 
   MoodEntry({
+    this.id,
     required this.date,
     required this.mood,
     required this.moodScore,
@@ -15,6 +17,7 @@ class MoodEntry {
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'date': date.toIso8601String(),
       'mood': mood,
       'moodScore': moodScore,
@@ -25,11 +28,14 @@ class MoodEntry {
 
   factory MoodEntry.fromJson(Map<String, dynamic> json) {
     return MoodEntry(
+      id: json['id'],
       date: DateTime.parse(json['date']),
       mood: json['mood'],
       moodScore: json['moodScore'],
       note: json['note'],
-      activities: List<String>.from(json['activities']),
+      activities: json['activities'] is List 
+          ? List<String>.from(json['activities']) 
+          : [],
     );
   }
 } 
