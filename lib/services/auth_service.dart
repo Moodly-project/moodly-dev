@@ -11,6 +11,26 @@ class AuthService {
 
   // Login de usuário
   static Future<Map<String, dynamic>> login(String email, String password) async {
+    // Login de teste com admin@admin.com e senha 123
+    if (email == 'admin@admin.com' && password == '123') {
+      // Criar token de teste
+      const String mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjEiLCJlbWFpbCI6ImFkbWluQGFkbWluLmNvbSIsImlhdCI6MTYzNTMzOTQwMiwiZXhwIjoxOTk5OTk5OTk5fQ.KA-IgvXlQA_UtPxRv9Dkg9-KnoUfpKrPUHbLAKVCPqs';
+      
+      // Criar dados de usuário de teste
+      final Map<String, dynamic> mockUser = {
+        'id': '1',
+        'name': 'Administrador',
+        'email': 'admin@admin.com',
+      };
+      
+      // Salvar token e dados do usuário
+      await _saveToken(mockToken);
+      await _saveUserData(mockUser);
+      
+      return {'success': true, 'user': mockUser};
+    }
+    
+    // Login regular através da API
     try {
       final response = await http.post(
         Uri.parse(ApiConfig.baseUrl + ApiConfig.login),
@@ -71,6 +91,12 @@ class AuthService {
       
       if (token == null) {
         return {'success': false, 'message': 'Usuário não autenticado'};
+      }
+      
+      // Se for o usuário de teste admin@admin.com
+      if (token.contains('admin@admin.com')) {
+        final userData = await getUserData();
+        return {'success': true, 'user': userData};
       }
 
       final response = await http.get(

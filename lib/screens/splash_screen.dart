@@ -110,10 +110,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
-                        Icons.psychology,
-                        size: 100,
-                        color: Colors.white,
+                      Image.asset(
+                        'assets/images/logotipo.png',
+                        width: 200,
+                        height: 200,
                       ),
                       const SizedBox(height: 24),
                       Text(

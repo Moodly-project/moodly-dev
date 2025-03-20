@@ -301,7 +301,19 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ? const CircularProgressIndicator()
                                   : Text(_isLogin ? 'ENTRAR' : 'REGISTRAR'),
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 8),
+                            if (_isLogin)
+                              TextButton(
+                                onPressed: () {
+                                  _emailController.text = 'admin@admin.com';
+                                  _passwordController.text = '123';
+                                },
+                                child: const Text(
+                                  'Usar conta de teste (admin@admin.com / 123)',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            const SizedBox(height: 8),
                             TextButton(
                               onPressed: _toggleAuthMode,
                               child: Text(_isLogin
